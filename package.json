@@ -1,0 +1,26 @@
+{
+  "name": "ai-mmo-rpg",
+  "version": "1.0.0",
+  "description": "Text-based MMO RPG with AI-generated worlds and global marketplace",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm run --parallel dev",
+    "build": "pnpm run --recursive build",
+    "test": "pnpm run --recursive test",
+    "lint": "pnpm run --recursive lint",
+    "db:generate": "cd packages/database && pnpm prisma generate",
+    "db:migrate": "cd packages/database && pnpm prisma migrate dev",
+    "db:studio": "cd packages/database && pnpm prisma studio",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0",
+    "prettier": "^3.1.0",
+    "eslint": "^8.56.0",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}

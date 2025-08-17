@@ -1,0 +1,507 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Users & Authentication
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  username     String   @unique
+  passwordHash String   @map("password_hash")
+  isActive     Boolean  @default(true) @map("is_active")
+  roles        String[] @default(["player"])
+  createdAt    DateTime @default(now()) @map("created_at")
+  lastLoginAt  DateTime? @map("last_login_at")
+
+  // Relations
+  sessions      Session[]
+  worlds        World[]
+  playerStates  PlayerState[]
+  inventories   Inventory[]
+  wallets       Wallet[]
+  orders        Order[]
+  escrows       Escrow[]      @relation("BuyerEscrows")
+  sellerEscrows Escrow[]      @relation("SellerEscrows")
+  transfers     Transfer[]    @relation("TransferUser")
+  chatMessages  ChatMessage[]
+  reports       Report[]      @relation("ReporterReports")
+  reportedBy    Report[]      @relation("TargetReports")
+  actions       Action[]
+
+  @@map("users")
+}
+
+model Session {
+  id           String    @id @default(cuid())
+  userId       String    @map("user_id")
+  expiresAt    DateTime  @map("expires_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  lastActiveAt DateTime  @default(now()) @map("last_active_at")
+  userAgent    String?   @map("user_agent")
+  ipAddress    String?   @map("ip_address")
+  isActive     Boolean   @default(true) @map("is_active")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// Worlds & Content
+model World {
+  id          String      @id @default(cuid())
+  ownerUserId String      @map("owner_user_id")
+  title       String
+  seed        String
+  status      WorldStatus @default(GENERATING)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  owner         User            @relation(fields: [ownerUserId], references: [id])
+  versions      WorldVersion[]
+  locations     Location[]
+  mobs          Mob[]
+  quests        Quest[]
+  playerStates  PlayerState[]
+  actions       Action[]
+  itemInstances ItemInstance[]
+
+  @@map("worlds")
+}
+
+enum WorldStatus {
+  GENERATING
+  VALIDATING
+  COMPILING
+  ACTIVE
+  ARCHIVED
+  ERROR
+}
+
+model WorldVersion {
+  id            String   @id @default(cuid())
+  worldId       String   @map("world_id")
+  version       Int
+  modelVersion  String   @map("model_version")
+  blueprintJson Json     @map("blueprint_json")
+  compiledJson  Json?    @map("compiled_json")
+  validationLog Json?    @map("validation_log")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relations
+  world World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@unique([worldId, version])
+  @@map("world_versions")
+}
+
+model Location {
+  id              String  @id @default(cuid())
+  worldId         String  @map("world_id")
+  key             String
+  name            String
+  description     String
+  biome           String
+  connectionsJson Json    @map("connections_json")
+  spawnsJson      Json?   @map("spawns_json")
+  itemsJson       Json?   @map("items_json")
+  eventsJson      Json?   @map("events_json")
+
+  // Relations
+  world        World         @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  playerStates PlayerState[]
+
+  @@unique([worldId, key])
+  @@map("locations")
+}
+
+model Mob {
+  id          String @id @default(cuid())
+  worldId     String @map("world_id")
+  key         String
+  name        String
+  description String
+  level       Int
+  statsJson   Json   @map("stats_json")
+  dropsJson   Json   @map("drops_json")
+  abilitiesJson Json? @map("abilities_json")
+  behavior    String
+  faction     String?
+
+  // Relations
+  world World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@unique([worldId, key])
+  @@map("mobs")
+}
+
+model Quest {
+  id           String @id @default(cuid())
+  worldId      String @map("world_id")
+  key          String
+  name         String
+  summary      String
+  description  String
+  level        Int
+  stepsJson    Json   @map("steps_json")
+  rewardsJson  Json   @map("rewards_json")
+  timeLimit    Int?   @map("time_limit")
+  repeatable   Boolean @default(false)
+  prerequisites String[] @default([])
+
+  // Relations
+  world World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@unique([worldId, key])
+  @@map("quests")
+}
+
+// Items & Inventory
+model ItemArchetype {
+  id           String @id @default(cuid())
+  slug         String @unique
+  name         String
+  description  String
+  rarity       String
+  slot         String
+  statsJson    Json   @map("stats_json")
+  tags         String[] @default([])
+  requirements Json?
+  value        Int    @default(0)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  instances ItemInstance[]
+  orders    Order[]
+
+  @@map("item_archetypes")
+}
+
+model ItemInstance {
+  id            String    @id @default(cuid())
+  archetypeId   String    @map("archetype_id")
+  mintWorldId   String    @map("mint_world_id")
+  rollJson      Json      @map("roll_json")
+  boundToUserId String?   @map("bound_to_user_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  archetype     ItemArchetype   @relation(fields: [archetypeId], references: [id])
+  mintWorld     World           @relation(fields: [mintWorldId], references: [id])
+  inventoryItems InventoryItem[]
+  escrows       Escrow[]
+
+  @@map("item_instances")
+}
+
+model Inventory {
+  id     String @id @default(cuid())
+  userId String @unique @map("user_id")
+
+  // Relations
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items InventoryItem[]
+
+  @@map("inventories")
+}
+
+model InventoryItem {
+  inventoryId    String @map("inventory_id")
+  itemInstanceId String @map("item_instance_id")
+  quantity       Int    @default(1)
+  equipped       Boolean @default(false)
+  slot           String?
+
+  // Relations
+  inventory    Inventory    @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  itemInstance ItemInstance @relation(fields: [itemInstanceId], references: [id], onDelete: Cascade)
+
+  @@id([inventoryId, itemInstanceId])
+  @@map("inventory_items")
+}
+
+// Economy & Marketplace
+model Currency {
+  id       String @id @default(cuid())
+  code     String @unique
+  name     String
+  symbol   String
+  decimals Int    @default(0)
+
+  // Relations
+  wallets   Wallet[]
+  orders    Order[]
+  escrows   Escrow[]
+  transfers Transfer[]
+
+  @@map("currencies")
+}
+
+model Wallet {
+  id            String @id @default(cuid())
+  userId        String @map("user_id")
+  currencyId    String @map("currency_id")
+  balance       BigInt @default(0)
+  lockedBalance BigInt @default(0) @map("locked_balance")
+  lastUpdated   DateTime @default(now()) @map("last_updated")
+
+  // Relations
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currency     Currency   @relation(fields: [currencyId], references: [id])
+  fromTransfers Transfer[] @relation("FromWallet")
+  toTransfers   Transfer[] @relation("ToWallet")
+
+  @@unique([userId, currencyId])
+  @@map("wallets")
+}
+
+model Order {
+  id               String      @id @default(cuid())
+  userId           String      @map("user_id")
+  type             OrderType
+  side             OrderSide
+  status           OrderStatus @default(PENDING)
+  itemArchetypeId  String?     @map("item_archetype_id")
+  itemInstanceId   String?     @map("item_instance_id")
+  price            BigInt
+  quantity         Int
+  filledQuantity   Int         @default(0) @map("filled_quantity")
+  currencyId       String      @map("currency_id")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  expiresAt        DateTime?   @map("expires_at")
+  lastUpdated      DateTime    @updatedAt @map("last_updated")
+  metadata         Json?
+
+  // Relations
+  user         User           @relation(fields: [userId], references: [id])
+  archetype    ItemArchetype? @relation(fields: [itemArchetypeId], references: [id])
+  currency     Currency       @relation(fields: [currencyId], references: [id])
+  fills        OrderFill[]
+  counterFills OrderFill[]    @relation("CounterpartyFills")
+
+  @@map("orders")
+}
+
+enum OrderType {
+  LIMIT
+  MARKET
+  AUCTION
+}
+
+enum OrderSide {
+  BUY
+  SELL
+}
+
+enum OrderStatus {
+  PENDING
+  PARTIAL
+  FILLED
+  CANCELLED
+  EXPIRED
+}
+
+model OrderFill {
+  id                   String   @id @default(cuid())
+  orderId              String   @map("order_id")
+  counterpartyOrderId  String   @map("counterparty_order_id")
+  quantity             Int
+  price                BigInt
+  makerFee             BigInt   @map("maker_fee")
+  takerFee             BigInt   @map("taker_fee")
+  totalFee             BigInt   @map("total_fee")
+  timestamp            DateTime @default(now())
+
+  // Relations
+  order            Order @relation(fields: [orderId], references: [id])
+  counterpartyOrder Order @relation("CounterpartyFills", fields: [counterpartyOrderId], references: [id])
+
+  @@map("order_fills")
+}
+
+model Escrow {
+  id            String       @id @default(cuid())
+  buyerUserId   String       @map("buyer_user_id")
+  sellerUserId  String       @map("seller_user_id")
+  itemInstanceId String      @map("item_instance_id")
+  currencyId    String       @map("currency_id")
+  amount        BigInt
+  status        EscrowStatus @default(CREATED)
+  createdAt     DateTime     @default(now()) @map("created_at")
+  expiresAt     DateTime?    @map("expires_at")
+  releasedAt    DateTime?    @map("released_at")
+  metadata      Json?
+
+  // Relations
+  buyer        User         @relation("BuyerEscrows", fields: [buyerUserId], references: [id])
+  seller       User         @relation("SellerEscrows", fields: [sellerUserId], references: [id])
+  itemInstance ItemInstance @relation(fields: [itemInstanceId], references: [id])
+  currency     Currency     @relation(fields: [currencyId], references: [id])
+
+  @@map("escrows")
+}
+
+enum EscrowStatus {
+  CREATED
+  FUNDED
+  RELEASED
+  DISPUTED
+  CANCELLED
+}
+
+model Transfer {
+  id            String         @id @default(cuid())
+  fromWalletId  String?        @map("from_wallet_id")
+  toWalletId    String?        @map("to_wallet_id")
+  userId        String         @map("user_id")
+  currencyId    String         @map("currency_id")
+  amount        BigInt
+  reason        TransferReason
+  referenceType String?        @map("reference_type")
+  referenceId   String?        @map("reference_id")
+  timestamp     DateTime       @default(now())
+  metadata      Json?
+
+  // Relations
+  fromWallet Wallet?  @relation("FromWallet", fields: [fromWalletId], references: [id])
+  toWallet   Wallet?  @relation("ToWallet", fields: [toWalletId], references: [id])
+  user       User     @relation("TransferUser", fields: [userId], references: [id])
+  currency   Currency @relation(fields: [currencyId], references: [id])
+
+  @@map("transfers")
+}
+
+enum TransferReason {
+  TRADE
+  ESCROW_FUND
+  ESCROW_RELEASE
+  FEE
+  REWARD
+  QUEST_REWARD
+  ADMIN_ADJUSTMENT
+  REFUND
+  BURN
+}
+
+// Game State & Actions
+model PlayerState {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  worldId     String   @map("world_id")
+  locationId  String   @map("location_id")
+  statsJson   Json     @map("stats_json")
+  activeQuests Json    @default("[]") @map("active_quests")
+  completedQuests String[] @default([]) @map("completed_quests")
+  cooldowns   Json     @default("{}") 
+  conditions  Json     @default("[]")
+  lastAction  DateTime? @map("last_action")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  world    World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id])
+
+  @@unique([userId, worldId])
+  @@map("player_states")
+}
+
+model Action {
+  id             String   @id @default(cuid())
+  worldId        String   @map("world_id")
+  userId         String   @map("user_id")
+  type           String
+  payloadJson    Json     @map("payload_json")
+  idempotencyKey String   @unique @map("idempotency_key")
+  resultJson     Json?    @map("result_json")
+  processed      Boolean  @default(false)
+  createdAt      DateTime @default(now()) @map("created_at")
+  processedAt    DateTime? @map("processed_at")
+
+  // Relations
+  world World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([worldId, createdAt])
+  @@index([userId, createdAt])
+  @@map("actions")
+}
+
+model GameEvent {
+  id        String   @id @default(cuid())
+  type      String
+  worldId   String   @map("world_id")
+  userId    String   @map("user_id")
+  dataJson  Json     @map("data_json")
+  visible   Boolean  @default(true)
+  broadcast Boolean  @default(false)
+  timestamp DateTime @default(now())
+
+  @@index([worldId, timestamp])
+  @@index([userId, timestamp])
+  @@map("game_events")
+}
+
+// Social & Communication
+model ChatMessage {
+  id        String   @id @default(cuid())
+  channelId String   @map("channel_id")
+  userId    String   @map("user_id")
+  text      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([channelId, createdAt])
+  @@map("chat_messages")
+}
+
+model Report {
+  id               String       @id @default(cuid())
+  reporterUserId   String       @map("reporter_user_id")
+  targetUserId     String?      @map("target_user_id")
+  targetType       String       @map("target_type")
+  targetId         String       @map("target_id")
+  reason           String
+  description      String?
+  status           ReportStatus @default(PENDING)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  resolvedAt       DateTime?    @map("resolved_at")
+  resolverUserId   String?      @map("resolver_user_id")
+
+  // Relations
+  reporter User  @relation("ReporterReports", fields: [reporterUserId], references: [id])
+  target   User? @relation("TargetReports", fields: [targetUserId], references: [id])
+
+  @@map("reports")
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
+// State integrity checks
+model StateCheck {
+  id        String   @id @default(cuid())
+  worldId   String   @map("world_id")
+  version   Int
+  hash      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([worldId, version])
+  @@map("state_checks")
+}
