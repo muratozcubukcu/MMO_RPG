@@ -1,0 +1,25 @@
+{
+  "name": "@ai-mmo/sdk-js",
+  "version": "1.0.0",
+  "description": "JavaScript SDK for AI MMO API",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint . --ext .ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": ["ai", "mmo", "rpg", "sdk", "api"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@ai-mmo/shared-types": "workspace:*",
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.3.1",
+    "eslint": "^8.42.0",
+    "typescript": "^5.1.3"
+  }
+}
