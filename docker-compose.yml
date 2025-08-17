@@ -1,0 +1,439 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # INFRASTRUCTURE SERVICES
+  # ============================================================================
+  
+  postgres:
+    image: postgres:15-alpine
+    container_name: ai-mmo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ai-mmo
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai-mmo-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ai-mmo
+
+  minio:
+    image: minio/minio:latest
+    container_name: ai-mmo-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - ai-mmo
+
+  # Initialize MinIO bucket
+  minio-init:
+    image: minio/mc:latest
+    container_name: ai-mmo-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 minio minio123;
+      /usr/bin/mc mb myminio/worlds --ignore-existing;
+      /usr/bin/mc anonymous set public myminio/worlds;
+      exit 0;
+      "
+    networks:
+      - ai-mmo
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ai-mmo-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - ai-mmo
+
+  # Pull required models for Ollama
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: ai-mmo-ollama-init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ollama_data:/root/.ollama
+    entrypoint: >
+      /bin/sh -c "
+      ollama pull llama3:8b-instruct;
+      echo 'Models pulled successfully';
+      "
+    environment:
+      - OLLAMA_HOST=ollama:11434
+    networks:
+      - ai-mmo
+
+  # ============================================================================
+  # APPLICATION SERVICES
+  # ============================================================================
+
+  gateway:
+    build:
+      context: .
+      dockerfile: apps/gateway/Dockerfile
+    container_name: ai-mmo-gateway
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DATABASE_URL=postgresql://app:app@postgres:5432/app
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=dev_secret_change_me_in_production
+      - GAME_SERVICE_URL=http://game-service:3001
+      - INVENTORY_SERVICE_URL=http://inventory-service:3005
+      - MARKET_SERVICE_URL=http://market-service:3006
+      - WORLDGEN_SERVICE_URL=http://worldgen-service:3002
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-mmo
+
+  game-service:
+    build:
+      context: .
+      dockerfile: apps/game-service/Dockerfile
+    container_name: ai-mmo-game-service
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - DATABASE_URL=postgresql://app:app@postgres:5432/app
+      - REDIS_URL=redis://redis:6379
+      - WS_NOTIFIER_URL=http://ws-notifier:3007
+      - INTERPRETER_SERVICE_URL=http://interpreter-service:3003
+      - NARRATOR_SERVICE_URL=http://narrator-service:3004
+      - INVENTORY_SERVICE_URL=http://inventory-service:3005
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-mmo
+
+  worldgen-service:
+    build:
+      context: .
+      dockerfile: apps/worldgen-service/Dockerfile
+    container_name: ai-mmo-worldgen-service
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - PORT=3002
+      - DATABASE_URL=postgresql://app:app@postgres:5432/app
+      - REDIS_URL=redis://redis:6379
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=minio
+      - MINIO_SECRET_KEY=minio123
+      - MINIO_BUCKET=worlds
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL_WORLDGEN=llama3:8b-instruct
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-mmo
+
+  interpreter-service:
+    build:
+      context: .
+      dockerfile: apps/interpreter-service/Dockerfile
+    container_name: ai-mmo-interpreter-service
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=development
+      - PORT=3003
+      - REDIS_URL=redis://redis:6379
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL_INTERPRETER=llama3:8b-instruct
+    depends_on:
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-mmo
+
+  narrator-service:
+    build:
+      context: .
+      dockerfile: apps/narrator-service/Dockerfile
+    container_name: ai-mmo-narrator-service
+    restart: unless-stopped
+    ports:
+      - "3004:3004"
+    environment:
+      - NODE_ENV=development
+      - PORT=3004
+      - REDIS_URL=redis://redis:6379
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL_NARRATOR=llama3:8b-instruct
+    depends_on:
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3004/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-mmo
+
+  inventory-service:
+    build:
+      context: .
+      dockerfile: apps/inventory-service/Dockerfile
+    container_name: ai-mmo-inventory-service
+    restart: unless-stopped
+    ports:
+      - "3005:3005"
+    environment:
+      - NODE_ENV=development
+      - PORT=3005
+      - DATABASE_URL=postgresql://app:app@postgres:5432/app
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3005/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-mmo
+
+  market-service:
+    build:
+      context: .
+      dockerfile: apps/market-service/Dockerfile
+    container_name: ai-mmo-market-service
+    restart: unless-stopped
+    ports:
+      - "3006:3006"
+    environment:
+      - NODE_ENV=development
+      - PORT=3006
+      - DATABASE_URL=postgresql://app:app@postgres:5432/app
+      - REDIS_URL=redis://redis:6379
+      - WS_NOTIFIER_URL=http://ws-notifier:3007
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3006/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-mmo
+
+  ws-notifier:
+    build:
+      context: .
+      dockerfile: apps/ws-notifier/Dockerfile
+    container_name: ai-mmo-ws-notifier
+    restart: unless-stopped
+    ports:
+      - "3007:3007"
+    environment:
+      - NODE_ENV=development
+      - PORT=3007
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3007/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-mmo
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: ai-mmo-web
+    restart: unless-stopped
+    ports:
+      - "3008:3008"
+    environment:
+      - NODE_ENV=development
+      - PORT=3008
+      - NEXT_PUBLIC_API_URL=http://localhost:3000
+      - NEXT_PUBLIC_WS_URL=ws://localhost:3007
+    depends_on:
+      gateway:
+        condition: service_healthy
+      ws-notifier:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3008/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-mmo
+
+  # ============================================================================
+  # DATABASE MIGRATION & SEEDING
+  # ============================================================================
+
+  db-migrate:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
+    container_name: ai-mmo-db-migrate
+    environment:
+      - DATABASE_URL=postgresql://app:app@postgres:5432/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "
+      echo 'Running database migrations...' &&
+      npx prisma migrate deploy &&
+      echo 'Generating Prisma client...' &&
+      npx prisma generate &&
+      echo 'Database setup complete!'
+      "
+    networks:
+      - ai-mmo
+
+  db-seed:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
+    container_name: ai-mmo-db-seed
+    environment:
+      - DATABASE_URL=postgresql://app:app@postgres:5432/app
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    command: >
+      sh -c "
+      echo 'Seeding database...' &&
+      npm run db:seed &&
+      echo 'Database seeding complete!'
+      "
+    networks:
+      - ai-mmo
+
+# ============================================================================
+# NETWORKS & VOLUMES
+# ============================================================================
+
+networks:
+  ai-mmo:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  ollama_data:
+    driver: local

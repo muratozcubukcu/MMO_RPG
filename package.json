@@ -1,0 +1,31 @@
+{
+  "name": "ai-mmo-root",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Text-based MMO RPG with AI-generated worlds",
+  "scripts": {
+    "dev": "concurrently \"pnpm --filter gateway dev\" \"pnpm --filter game-service dev\" \"pnpm --filter worldgen-service dev\" \"pnpm --filter interpreter-service dev\" \"pnpm --filter narrator-service dev\" \"pnpm --filter inventory-service dev\" \"pnpm --filter market-service dev\" \"pnpm --filter ws-notifier dev\" \"pnpm --filter web dev\"",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "dev:db:migrate": "cd infra && pnpm prisma migrate dev",
+    "dev:db:seed": "cd infra && pnpm prisma db seed",
+    "dev:db:reset": "cd infra && pnpm prisma migrate reset",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "concurrently": "^8.2.2",
+    "prettier": "^3.1.0",
+    "typescript": "^5.3.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "infra"
+  ],
+  "packageManager": "pnpm@8.12.0"
+}
