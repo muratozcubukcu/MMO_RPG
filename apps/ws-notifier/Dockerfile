@@ -20,6 +20,10 @@ COPY packages/ ./packages/
 COPY apps/ws-notifier/ ./apps/ws-notifier/
 
 # Build shared packages
+# Ensure workspace dependencies are properly linked
+RUN pnpm install --frozen-lockfile --prefer-offline
+
+# Build shared packages
 RUN pnpm --filter @ai-mmo/shared-types build
 
 # Build application
@@ -61,4 +65,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3007/healthz || exit 1
 
 # Start the application
-CMD ["node", "apps/ws-notifier/dist/main"]
+CMD ["node", "apps/ws-notifier/dist/apps/ws-notifier/src/main.js"]

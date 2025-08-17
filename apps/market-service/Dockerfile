@@ -21,7 +21,12 @@ COPY packages/ ./packages/
 COPY apps/market-service/ ./apps/market-service/
 
 # Build shared packages
+# Ensure workspace dependencies are properly linked
+RUN pnpm install --frozen-lockfile --prefer-offline
+
+# Build shared packages
 RUN pnpm --filter @ai-mmo/shared-types build
+RUN pnpm --filter @ai-mmo/rules-engine build
 RUN pnpm --filter @ai-mmo/rules-engine build
 
 # Build application
@@ -65,4 +70,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3006/healthz || exit 1
 
 # Start the application
-CMD ["node", "apps/market-service/dist/main"]
+CMD ["node", "apps/market-service/dist/apps/market-service/src/main.js"]

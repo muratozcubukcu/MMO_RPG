@@ -63,9 +63,11 @@ export class GameService {
       );
       command = interpretedCommand.primary;
       processingNotes.push(`Interpreted: "${request.text}" → ${command.type}`);
-    } else {
+    } else if ('command' in request) {
       // Structured command
       command = request.command;
+    } else {
+      throw new Error('Invalid request: must provide either text or command');
     }
 
     // Process the command

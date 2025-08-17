@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ============================================================================
   # INFRASTRUCTURE SERVICES
@@ -81,43 +79,8 @@ services:
     networks:
       - ai-mmo
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ai-mmo-ollama
-    restart: unless-stopped
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    environment:
-      - OLLAMA_HOST=0.0.0.0
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-    networks:
-      - ai-mmo
-
-  # Pull required models for Ollama
-  ollama-init:
-    image: ollama/ollama:latest
-    container_name: ai-mmo-ollama-init
-    depends_on:
-      ollama:
-        condition: service_healthy
-    volumes:
-      - ollama_data:/root/.ollama
-    entrypoint: >
-      /bin/sh -c "
-      ollama pull llama3:8b-instruct;
-      echo 'Models pulled successfully';
-      "
-    environment:
-      - OLLAMA_HOST=ollama:11434
-    networks:
-      - ai-mmo
+  # Using host Ollama service instead of containerized one
+  # The host system already has Ollama running on port 11434
 
   # ============================================================================
   # APPLICATION SERVICES
@@ -201,7 +164,7 @@ services:
       - MINIO_ACCESS_KEY=minio
       - MINIO_SECRET_KEY=minio123
       - MINIO_BUCKET=worlds
-      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_HOST=http://host.docker.internal:11434
       - OLLAMA_MODEL_WORLDGEN=llama3:8b-instruct
     depends_on:
       postgres:
@@ -210,8 +173,7 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-      ollama:
-        condition: service_healthy
+
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3002/healthz"]
       interval: 30s
@@ -232,13 +194,12 @@ services:
       - NODE_ENV=development
       - PORT=3003
       - REDIS_URL=redis://redis:6379
-      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_HOST=http://host.docker.internal:11434
       - OLLAMA_MODEL_INTERPRETER=llama3:8b-instruct
     depends_on:
       redis:
         condition: service_healthy
-      ollama:
-        condition: service_healthy
+
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3003/healthz"]
       interval: 30s
@@ -259,13 +220,12 @@ services:
       - NODE_ENV=development
       - PORT=3004
       - REDIS_URL=redis://redis:6379
-      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_HOST=http://host.docker.internal:11434
       - OLLAMA_MODEL_NARRATOR=llama3:8b-instruct
     depends_on:
       redis:
         condition: service_healthy
-      ollama:
-        condition: service_healthy
+
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3004/healthz"]
       interval: 30s
@@ -435,5 +395,4 @@ volumes:
     driver: local
   minio_data:
     driver: local
-  ollama_data:
-    driver: local
+

@@ -20,6 +20,9 @@ RUN pnpm install --frozen-lockfile
 COPY packages/ ./packages/
 COPY infra/ ./infra/
 
+# Ensure workspace dependencies are properly linked
+RUN pnpm install --frozen-lockfile --prefer-offline
+
 # Build shared packages
 RUN pnpm --filter @ai-mmo/shared-types build
 RUN pnpm --filter @ai-mmo/rules-engine build

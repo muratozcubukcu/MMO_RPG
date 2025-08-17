@@ -20,6 +20,10 @@ COPY packages/ ./packages/
 COPY apps/web/ ./apps/web/
 
 # Build shared packages
+# Ensure workspace dependencies are properly linked
+RUN pnpm install --frozen-lockfile --prefer-offline
+
+# Build shared packages
 RUN pnpm --filter @ai-mmo/shared-types build
 
 # Build Next.js application

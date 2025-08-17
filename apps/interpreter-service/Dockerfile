@@ -20,6 +20,10 @@ COPY packages/ ./packages/
 COPY apps/interpreter-service/ ./apps/interpreter-service/
 
 # Build shared packages
+# Ensure workspace dependencies are properly linked
+RUN pnpm install --frozen-lockfile --prefer-offline
+
+# Build shared packages
 RUN pnpm --filter @ai-mmo/shared-types build
 
 # Build application
@@ -61,4 +65,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3003/healthz || exit 1
 
 # Start the application
-CMD ["node", "apps/interpreter-service/dist/main"]
+CMD ["node", "apps/interpreter-service/dist/apps/interpreter-service/src/main.js"]

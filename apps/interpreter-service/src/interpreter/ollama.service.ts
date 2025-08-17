@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
+import { AxiosResponse } from 'axios';
 
 export interface OllamaGenerateRequest {
   model: string;
@@ -50,6 +51,7 @@ export class OllamaService {
     try {
       const fullRequest: OllamaGenerateRequest = {
         model: this.model,
+        prompt: request.prompt || '',
         format: 'json',
         options: {
           temperature: 0,
@@ -60,7 +62,7 @@ export class OllamaService {
 
       this.logger.debug(`Generating with Ollama: ${JSON.stringify(fullRequest)}`);
 
-      const response = await firstValueFrom(
+      const response: AxiosResponse<OllamaGenerateResponse> = await firstValueFrom(
         this.httpService.post<OllamaGenerateResponse>(
           `${this.ollamaHost}/api/generate`,
           fullRequest,
@@ -83,7 +85,7 @@ export class OllamaService {
 
   async healthCheck(): Promise<boolean> {
     try {
-      const response = await firstValueFrom(
+      const response: AxiosResponse<any> = await firstValueFrom(
         this.httpService.get(`${this.ollamaHost}/api/tags`, {
           timeout: 5000,
         }),

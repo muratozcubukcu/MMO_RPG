@@ -46,8 +46,6 @@ import { PrismaModule } from './prisma/prisma.module';
           ],
         }),
       },
-      playground: process.env.GRAPHQL_PLAYGROUND === 'true',
-      introspection: true,
     }),
 
     // Application modules

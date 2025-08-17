@@ -24,19 +24,21 @@ model User {
   lastLoginAt DateTime? @map("last_login_at")
 
   // Relations
-  sessions      Session[]
-  worlds        World[]
-  playerStates  PlayerState[]
-  actions       Action[]
-  combatLogs    CombatLog[]
-  inventories   Inventory[]
-  wallets       Wallet[]
-  orders        Order[]
-  escrows       Escrow[] @relation("BuyerEscrows")
-  sellerEscrows Escrow[] @relation("SellerEscrows")
-  chatMessages  ChatMessage[]
-  reports       Report[] @relation("ReporterReports")
-  targetReports Report[] @relation("TargetReports")
+  sessions         Session[]
+  worlds           World[]
+  playerStates     PlayerState[]
+  actions          Action[]
+  combatLogs       CombatLog[]
+  inventories      Inventory[]
+  wallets          Wallet[]
+  orders           Order[]
+  escrows          Escrow[] @relation("BuyerEscrows")
+  sellerEscrows    Escrow[] @relation("SellerEscrows")
+  chatMessages     ChatMessage[]
+  reports          Report[] @relation("ReporterReports")
+  targetReports    Report[] @relation("TargetReports")
+  worldGenJobs     WorldGenJob[]
+  boundItemInstances ItemInstance[] @relation("BoundToUser")
 
   @@map("users")
 }
@@ -306,7 +308,7 @@ model ItemInstance {
 
   // Relations
   archetype     ItemArchetype  @relation(fields: [archetypeSlug], references: [slug])
-  boundToUser   User?          @relation(fields: [boundToUserId], references: [id])
+  boundToUser   User?          @relation("BoundToUser", fields: [boundToUserId], references: [id])
   inventoryItems InventoryItem[]
   orders        Order[]
   escrows       Escrow[]
@@ -373,8 +375,6 @@ model Wallet {
   // Relations
   user          User       @relation(fields: [userId], references: [id])
   currency      Currency   @relation(fields: [currencyId], references: [id])
-  buyOrders     Order[]    @relation("BuyerOrders")
-  sellOrders    Order[]    @relation("SellerOrders")
   buyerEscrows  Escrow[]   @relation("BuyerWalletEscrows")
   sellerEscrows Escrow[]   @relation("SellerWalletEscrows")
   fromTransfers Transfer[] @relation("FromWalletTransfers")

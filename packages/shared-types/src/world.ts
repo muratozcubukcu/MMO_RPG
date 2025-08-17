@@ -94,6 +94,12 @@ export const ItemArchetypeSchema = z.object({
   value: z.number().int().min(0).default(0), // base gold value
   stackable: z.boolean().default(false),
   maxStack: z.number().int().min(1).default(1),
+  levelRequirement: z.number().int().min(1).optional(), // minimum level to use
+  classRestrictions: z.array(z.string()).optional(), // class names that can use this item
+  usable: z.object({
+    charges: z.number().int().min(1).optional(), // number of uses before consumed
+    cooldown: z.number().min(0).optional(), // cooldown in seconds between uses
+  }).optional(), // consumable/tool usage properties
 });
 
 // Loot table

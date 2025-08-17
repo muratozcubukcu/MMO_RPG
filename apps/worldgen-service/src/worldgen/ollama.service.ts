@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
+import { AxiosResponse } from 'axios';
 
 export interface OllamaGenerateRequest {
   model: string;
@@ -50,6 +51,7 @@ export class OllamaService {
     try {
       const fullRequest: OllamaGenerateRequest = {
         model: this.model,
+        prompt: request.prompt || '',
         format: 'json',
         options: {
           temperature: 0.7, // More creative for world generation
