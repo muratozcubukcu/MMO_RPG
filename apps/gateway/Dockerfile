@@ -19,14 +19,17 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY packages/ ./packages/
 COPY apps/gateway/ ./apps/gateway/
+COPY infra/prisma/ ./infra/prisma/
 
 # Build shared packages
 # Ensure workspace dependencies are properly linked
 RUN pnpm install --frozen-lockfile --prefer-offline
 
+# Generate Prisma client
+RUN npx prisma generate --schema=./infra/prisma/schema.prisma
+
 # Build shared packages
 RUN pnpm --filter @ai-mmo/shared-types build
-RUN pnpm --filter @ai-mmo/rules-engine build
 RUN pnpm --filter @ai-mmo/rules-engine build
 
 # Build application
@@ -45,9 +48,14 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY packages/shared-types/package.json ./packages/shared-types/
 COPY packages/rules-engine/package.json ./packages/rules-engine/
 COPY apps/gateway/package.json ./apps/gateway/
+COPY infra/package.json ./infra/
+COPY infra/prisma/ ./infra/prisma/
 
 # Install production dependencies only
 RUN pnpm install --frozen-lockfile --prod
+
+# Copy generated Prisma client from base stage
+COPY --from=base /app/node_modules/.prisma ./node_modules/.prisma
 
 # Copy built packages and application
 COPY --from=base /app/packages/shared-types/dist ./packages/shared-types/dist
