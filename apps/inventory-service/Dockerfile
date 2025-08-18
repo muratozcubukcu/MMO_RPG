@@ -19,14 +19,14 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY packages/ ./packages/
 COPY apps/inventory-service/ ./apps/inventory-service/
-COPY infra/prisma/ ./infra/prisma/
+COPY infra/ ./infra/
 
 # Build shared packages
 # Ensure workspace dependencies are properly linked
 RUN pnpm install --frozen-lockfile --prefer-offline
 
 # Generate Prisma client
-RUN pnpm exec prisma generate --schema=./infra/prisma/schema.prisma
+RUN npm install -g prisma && cd infra && PRISMA_SKIP_POSTINSTALL_GENERATE=true npx prisma generate
 
 # Build shared packages
 RUN pnpm --filter @ai-mmo/shared-types build
