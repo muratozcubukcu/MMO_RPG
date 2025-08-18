@@ -26,7 +26,7 @@ COPY infra/prisma/ ./infra/prisma/
 RUN pnpm install --frozen-lockfile --prefer-offline
 
 # Generate Prisma client
-RUN npx prisma generate --schema=./infra/prisma/schema.prisma
+RUN npm install -g prisma && npx prisma generate --schema=./infra/prisma/schema.prisma
 
 # Build shared packages
 RUN pnpm --filter @ai-mmo/shared-types build
