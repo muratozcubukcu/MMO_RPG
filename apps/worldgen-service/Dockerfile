@@ -26,7 +26,7 @@ COPY infra/prisma/ ./infra/prisma/
 RUN pnpm install --frozen-lockfile --prefer-offline
 
 # Generate Prisma client
-RUN npm install -g prisma && npx prisma generate --schema=./infra/prisma/schema.prisma
+RUN pnpm exec prisma generate --schema=./infra/prisma/schema.prisma
 
 # Build shared packages
 RUN pnpm --filter @ai-mmo/shared-types build
@@ -54,8 +54,8 @@ COPY infra/prisma/ ./infra/prisma/
 # Install production dependencies only
 RUN pnpm install --frozen-lockfile --prod
 
-# Generate Prisma client in production
-RUN npm install -g prisma && npx prisma generate --schema=./infra/prisma/schema.prisma
+# Copy generated Prisma client from base stage
+COPY --from=base /app/node_modules/.prisma ./node_modules/.prisma
 
 # Copy built packages and application
 COPY --from=base /app/packages/shared-types/dist ./packages/shared-types/dist
