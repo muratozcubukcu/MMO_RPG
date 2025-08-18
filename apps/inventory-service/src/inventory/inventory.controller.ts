@@ -77,7 +77,7 @@ export class InventoryController {
     return {
       success: true,
       data: result,
-      message: `Equipped ${result.itemInstance.archetype.name}`,
+      message: `Equipped ${result.itemInstance?.archetype?.name || 'item'}`,
     };
   }
 
@@ -92,7 +92,7 @@ export class InventoryController {
     return {
       success: true,
       data: result,
-      message: `Unequipped ${result.itemInstance.archetype.name}`,
+      message: `Unequipped ${result.itemInstance?.archetype?.name || 'item'}`,
     };
   }
 
@@ -131,7 +131,7 @@ export class InventoryController {
     return {
       success: true,
       data: result,
-      message: `Added ${result.itemInstance.archetype.name} to inventory`,
+      message: `Added ${result.itemInstance?.archetype?.name || 'item'} to inventory`,
     };
   }
 

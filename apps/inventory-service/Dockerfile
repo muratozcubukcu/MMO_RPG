@@ -55,7 +55,7 @@ COPY infra/prisma/ ./infra/prisma/
 RUN pnpm install --frozen-lockfile --prod
 
 # Copy generated Prisma client from base stage
-COPY --from=base /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=base /app/node_modules/.pnpm ./node_modules/.pnpm
 
 # Copy built packages and application
 COPY --from=base /app/packages/shared-types/dist ./packages/shared-types/dist

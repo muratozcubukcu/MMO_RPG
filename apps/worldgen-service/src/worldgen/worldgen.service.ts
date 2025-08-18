@@ -64,13 +64,13 @@ export class WorldGenService {
     };
   }
 
-  async getWorldGenJob(jobId: string): Promise<WorldGenJob | null> {
+  async getWorldGenJob(jobId: string): Promise<any | null> {
     return this.prisma.worldGenJob.findUnique({
       where: { id: jobId },
     });
   }
 
-  async getWorldGenJobs(userId: string): Promise<WorldGenJob[]> {
+  async getWorldGenJobs(userId: string): Promise<any[]> {
     return this.prisma.worldGenJob.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
@@ -90,7 +90,7 @@ export class WorldGenService {
   }
 
   async getWorlds(userId?: string, limit: number = 20, offset: number = 0) {
-    const where = userId ? { ownerId: userId } : { status: 'READY' };
+    const where = userId ? { ownerId: userId } : { status: 'READY' as const };
 
     return this.prisma.world.findMany({
       where,

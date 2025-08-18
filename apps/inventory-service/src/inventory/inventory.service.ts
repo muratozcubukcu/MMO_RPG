@@ -3,9 +3,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface CreateItemInstanceOptions {
-  archetypeId: string;
+  archetypeSlug: string;
   mintWorldId: string;
-  rollJson?: any;
+  rollDataJson?: any;
   boundToUserId?: string;
 }
 
@@ -40,9 +40,6 @@ export class InventoryService {
               },
             },
           },
-          orderBy: {
-            createdAt: 'desc',
-          },
         },
       },
     });
@@ -68,11 +65,11 @@ export class InventoryService {
   }
 
   async createItemInstance(options: CreateItemInstanceOptions) {
-    const { archetypeId, mintWorldId, rollJson, boundToUserId } = options;
+    const { archetypeSlug, mintWorldId, rollDataJson, boundToUserId } = options;
 
     // Verify archetype exists
     const archetype = await this.prisma.itemArchetype.findUnique({
-      where: { id: archetypeId },
+      where: { slug: archetypeSlug },
     });
 
     if (!archetype) {
@@ -82,9 +79,9 @@ export class InventoryService {
     // Create item instance
     const itemInstance = await this.prisma.itemInstance.create({
       data: {
-        archetypeId,
+        archetypeSlug,
         mintWorldId,
-        rollJson: rollJson || {},
+        rollDataJson: rollDataJson || {},
         boundToUserId,
       },
       include: {
@@ -162,7 +159,6 @@ export class InventoryService {
         itemInstanceId,
         quantity,
         equipped,
-        slot,
       },
       include: {
         itemInstance: {
@@ -344,18 +340,31 @@ export class InventoryService {
       throw new BadRequestException(`Item cannot be equipped in ${slot} slot`);
     }
 
-    // Unequip any existing item in this slot
-    await this.prisma.inventoryItem.updateMany({
+    // Unequip any existing item in this slot (check by archetype slot)
+    const existingEquipped = await this.prisma.inventoryItem.findMany({
       where: {
         inventoryId: inventory.id,
-        slot,
         equipped: true,
-      },
-      data: {
-        equipped: false,
-        slot: null,
+        itemInstance: {
+          archetype: {
+            slot: archetype.slot,
+          },
+        },
       },
     });
+
+    // Unequip existing items of the same slot type
+    for (const item of existingEquipped) {
+      await this.prisma.inventoryItem.update({
+        where: {
+          inventoryId_itemInstanceId: {
+            inventoryId: inventory.id,
+            itemInstanceId: item.itemInstanceId,
+          },
+        },
+        data: { equipped: false },
+      });
+    }
 
     // Equip the new item
     return this.prisma.inventoryItem.update({
@@ -367,7 +376,6 @@ export class InventoryService {
       },
       data: {
         equipped: true,
-        slot,
       },
       include: {
         itemInstance: {
@@ -411,7 +419,6 @@ export class InventoryService {
       },
       data: {
         equipped: false,
-        slot: null,
       },
       include: {
         itemInstance: {

@@ -5,8 +5,8 @@ export interface CreateItemArchetypeOptions {
   slug: string;
   name: string;
   description: string;
-  rarity: 'COMMON' | 'UNCOMMON' | 'RARE' | 'EPIC' | 'LEGENDARY';
-  slot: 'WEAPON' | 'HEAD' | 'CHEST' | 'LEGS' | 'FEET' | 'HANDS' | 'RING' | 'TRINKET' | 'CONSUMABLE' | 'MISC';
+  rarity: 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY';
+  slot: 'WEAPON' | 'HEAD' | 'CHEST' | 'LEGS' | 'FEET' | 'HANDS' | 'RING' | 'TRINKET' | 'CONSUMABLE';
   statsJson?: any;
   tagsJson?: string[];
   value?: number;
@@ -148,7 +148,7 @@ export class ItemService {
 
     // Check if any instances exist
     const instanceCount = await this.prisma.itemInstance.count({
-      where: { archetypeId: id },
+      where: { archetypeSlug: item.slug },
     });
 
     if (instanceCount > 0) {
@@ -178,7 +178,7 @@ export class ItemService {
     const where: any = {};
 
     if (archetypeId) {
-      where.archetypeId = archetypeId;
+      where.archetypeSlug = archetypeId;
     }
 
     if (mintWorldId) {
@@ -267,9 +267,9 @@ export class ItemService {
         ia.rarity,
         ia.slot,
         COUNT(ii.id) as usage_count
-      FROM "ItemArchetype" ia
-      JOIN "ItemInstance" inst ON inst."archetypeId" = ia.id
-      JOIN "InventoryItem" ii ON ii."itemInstanceId" = inst.id
+      FROM "item_archetypes" ia
+      JOIN "item_instances" inst ON inst."archetype_slug" = ia.slug
+      JOIN "inventory_items" ii ON ii."item_instance_id" = inst.id
       GROUP BY ia.id, ia.name, ia.slug, ia.rarity, ia.slot
       ORDER BY usage_count DESC
       LIMIT ${limit}
