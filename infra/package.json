@@ -14,10 +14,10 @@
     "@prisma/client": "^5.7.0",
     "@ai-mmo/shared-types": "workspace:*",
     "@ai-mmo/rules-engine": "workspace:*",
-    "bcryptjs": "^2.4.3"
+    "bcryptjs": "^2.4.3",
+    "prisma": "^5.7.0"
   },
   "devDependencies": {
-    "prisma": "^5.7.0",
     "tsx": "^4.6.0",
     "@types/bcryptjs": "^2.4.6"
   }

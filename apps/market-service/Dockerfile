@@ -55,7 +55,7 @@ COPY infra/prisma/ ./infra/prisma/
 RUN pnpm install --frozen-lockfile --prod
 
 # Generate Prisma client in production
-RUN npx prisma generate --schema=./infra/prisma/schema.prisma
+RUN npm install -g prisma && npx prisma generate --schema=./infra/prisma/schema.prisma
 
 # Copy built packages and application
 COPY --from=base /app/packages/shared-types/dist ./packages/shared-types/dist
